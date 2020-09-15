@@ -12,8 +12,14 @@ Example:
 1          frame2           1 2020-01-01 00:01:40      4.0      5.0      6.0
 ```
 
+## Caveats
+This library assumes it is built and run on little-endian architectures only.
+
 ## TODOs
 * Add benchmarks
+* Profile
+* Prealloacte memory, expose blob/array handling options
 * Add optional support for dynamic arrays 
 * Add optional support for blobs
 * Allow including/excluding fields
+* Support extracting multiple topics at once
