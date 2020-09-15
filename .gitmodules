@@ -1,0 +1,4 @@
+[submodule "ros_msg_parser"]
+	path = ros_msg_parser
+	url = git@github.com:samkhal/ros_msg_parser.git
+	branch = master
