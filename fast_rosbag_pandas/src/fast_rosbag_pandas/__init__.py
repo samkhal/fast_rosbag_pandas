@@ -28,5 +28,5 @@ def rosbag_to_dataframe(bagpath, topic):
         pandas.DataFrame: dataframe representation of topic
     """
 
-    array = rosbag_to_ndarrays.rosbag_to_ndarrays(bagpath, topic)
-    return pandas.DataFrame(array)
+    arrays = rosbag_to_ndarrays.rosbag_to_ndarrays(bagpath, topic)
+    return pandas.DataFrame(arrays)

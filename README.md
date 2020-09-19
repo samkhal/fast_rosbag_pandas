@@ -30,7 +30,7 @@ This library assumes it is built and run on little-endian architectures only.
 
 # TODOs
 * Profile
-* Prealloacte memory, expose blob/array handling options
+* Expose blob/array handling options
 * Add optional support for dynamic arrays 
 * Add optional support for blobs
 * Allow including/excluding fields
