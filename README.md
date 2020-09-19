@@ -12,11 +12,23 @@ Example:
 1          frame2           1 2020-01-01 00:01:40      4.0      5.0      6.0
 ```
 
-## Caveats
+# Benchmarks
+
+fast_rosbag_pandas is about 3x faster than rosbag_pandas on large datasets, and ~30x faster on small ones.
+Note: fast_rosbag_pandas doesn't currently construct an index, while rosbag_pandas does.
+
+## Bag of StampedPoint messages
+|                |   rosbag_pandas (s)   |fast_rosbag_pandas (s)|
+|:---------------|----------------------:|---------------------:|
+| points_1k.bag  |              0.316    |           0.009      |
+| points_1m.bag  |             19.707    |           6.980      |
+| points_10m.bag |            196.645    |          69.321      |
+
+
+# Caveats
 This library assumes it is built and run on little-endian architectures only.
 
-## TODOs
-* Add benchmarks
+# TODOs
 * Profile
 * Prealloacte memory, expose blob/array handling options
 * Add optional support for dynamic arrays 

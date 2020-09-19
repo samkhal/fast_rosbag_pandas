@@ -13,6 +13,10 @@
   <depend>rospy</depend>
   <depend>pybind11_catkin</depend>
   <depend>ros_msg_parser</depend>
+  <depend>rosbag_storage</depend>
+
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>python-pandas</exec_depend>
 
   <test_depend>std_msgs</test_depend>
   <test_depend>geometry_msgs</test_depend>
