@@ -14,22 +14,24 @@ Example:
 
 # Benchmarks
 
-fast_rosbag_pandas is about 3x faster than rosbag_pandas on large datasets, and ~30x faster on small ones.
+Benchmarks comparing fast_rosbag_pandas (latest) to rosbag_pandas (0.5.0.0, pure python implementation).
 Note: fast_rosbag_pandas doesn't currently construct an index, while rosbag_pandas does.
 
 ## Bag of StampedPoint messages
-|                |   rosbag_pandas (s)   |fast_rosbag_pandas (s)|
-|:---------------|----------------------:|---------------------:|
-| points_1k.bag  |              0.316    |           0.009      |
-| points_1m.bag  |             19.707    |           6.980      |
-| points_10m.bag |            196.645    |          69.321      |
+|                |   rosbag_pandas (s) |   fast_rosbag_pandas (s) |   speedup factor |
+|:---------------|--------------------:|-------------------------:|-----------------:|
+| points_1k.bag  |              0.3523 |                   0.0030 |            118.9 |
+| points_1m.bag  |             20.6134 |                   1.6861 |             12.2 |
+| points_10m.bag |            203.6415 |                  16.0912 |             12.7 |
 
-
-# Caveats
+# Limitations
 This library assumes it is built and run on little-endian architectures only.
 
+Currently, fast_rosbag_pandas does not support:
+* Building an index
+* Dynamic-length arrays
+
 # TODOs
-* Profile
 * Expose blob/array handling options
 * Add optional support for dynamic arrays 
 * Add optional support for blobs
