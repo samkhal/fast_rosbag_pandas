@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(fast_rosbag_pandas)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++14)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -105,7 +105,7 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+   INCLUDE_DIRS include
 #  LIBRARIES fast_rosbag_pandas
    CATKIN_DEPENDS pybind11_catkin
 #  DEPENDS system_lib
@@ -118,11 +118,11 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
-pybind_add_module(rosbag_to_ndarrays MODULE src/rosbag_to_ndarrays.cpp)
+pybind_add_module(rosbag_to_ndarrays SHARED src/rosbag_to_ndarrays.cpp)
 target_compile_options(rosbag_to_ndarrays PRIVATE -std=c++17 -Wno-register)
 
 ## Declare a C++ library
@@ -138,7 +138,11 @@ target_compile_options(rosbag_to_ndarrays PRIVATE -std=c++17 -Wno-register)
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/fast_rosbag_pandas_node.cpp)
+add_executable(${PROJECT_NAME}_benchmark src/benchmark.cpp)
+target_link_libraries(${PROJECT_NAME}_benchmark
+  rosbag_to_ndarrays
+  ${catkin_LIBRARIES}
+)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
