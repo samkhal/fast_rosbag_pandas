@@ -198,11 +198,12 @@ class TopicAggregator
   void addMessage(const rosbag::MessageInstance& msg)
   {
     // write the message into the buffer
-    buffer_.resize(msg.size());
-    ros::serialization::OStream stream(buffer_.data(), msg.size());
+    auto msg_size = msg.size();
+    buffer_.resize(msg_size);
+    ros::serialization::OStream stream(buffer_.data(), msg_size);
     msg.write(stream);
 
-    RosMsgParser::Span<const uint8_t> buffer(buffer_.data(), msg.size());
+    RosMsgParser::Span<const uint8_t> buffer(buffer_.data(), msg_size);
     parser_.deserializeIntoFlatMsg(buffer, &flat_msg_);
 
     for (auto& [leaf, variant] : flat_msg_.value)
