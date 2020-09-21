@@ -12,9 +12,23 @@ Example:
 1          frame2           1 2020-01-01 00:01:40      4.0      5.0      6.0
 ```
 
+Conversion rules are as follows:
+  * One column is produced per field of the ROS message
+  * Column names are the path to the field, e.g. pose/point/x
+  * Column dtypes:
+    * ROS `string` becomes numpy `object`
+    * ROS `Time`/`Duration` become numpy `datetime64[ns]`/`timedelta64[ns]`
+    * All other primitive ROS types are directly mapped to numpy primitives
+  * Fixed-size arrays are unpacked into separate columns, with names like `foo/bar.2/baz`
+  * Dynamic-size arrays are skipped
+
 # Benchmarks
 
-Benchmarks comparing fast_rosbag_pandas (latest) to rosbag_pandas (0.5.0.0, pure python implementation).
+Benchmarking code is at [fast_rosbag_pandas_benchmark](https://github.com/samkhal/fast_rosbag_pandas_benchmark).
+
+Graphs of performance over time this package over time are on the [airspeed velocity site](https://samkhal.github.io/fast_rosbag_pandas_benchmark).
+
+Benchmarks comparing `fast_rosbag_pandas` (latest) to `rosbag_pandas` (0.5.0.0, pure python implementation) are below.
 Note: fast_rosbag_pandas doesn't currently construct an index, while rosbag_pandas does.
 
 ## Bag of StampedPoint messages
