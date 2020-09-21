@@ -34,6 +34,43 @@ struct field_hash
 
 namespace fast_rosbag_pandas
 {
+/** OwningStream is based on the interface of ros::serialization::Stream.
+ * Unlike Stream, OwningStream owns the data and implements `advance` in safe way,
+ * allowing this stream to be used without prior knowledge of the stream size.
+ *
+ * It is meant to be used only as an argument to MessageInstance::write(), which only needs `advance`.
+ * This relies on the implementation details of rosbag_storage, but allows us to avoid needing to call
+ * MessageInstance::size() in advance. As a result, we avoid having Bag::readMessageDataHeaderFromBuffer
+ * being called twice.
+ */
+struct OwningStream
+{
+  OwningStream()
+  {
+  }
+
+  // Resize the datastore to len size and return a pointer to the beginning of the data
+  uint8_t* advance(uint32_t len)
+  {
+    ROS_ASSERT(bytes_.empty());  // May only be called if bytes is clear
+    bytes_.resize(len);
+    return bytes_.data();
+  }
+
+  RosMsgParser::Span<const uint8_t> getSpan() const
+  {
+    return RosMsgParser::Span<const uint8_t>(bytes_.data(), bytes_.size());
+  }
+
+  void clear()
+  {
+    bytes_.clear();
+  }
+
+ private:
+  std::vector<uint8_t> bytes_;
+};
+
 /// @brief Return true if the numpy and ROS representations of this type share the same byte layout
 inline bool sameLayout(const RosMsgParser::BuiltinType c)
 {
@@ -197,13 +234,12 @@ class TopicAggregator
 
   void addMessage(const rosbag::MessageInstance& msg)
   {
-    // write the message into the buffer
-    auto msg_size = msg.size();
-    buffer_.resize(msg_size);
-    ros::serialization::OStream stream(buffer_.data(), msg_size);
-    msg.write(stream);
+    // By using OwningStream instead of ros::serialization::OStream here,
+    // we can avoid having to call msg.size()
+    owning_stream_.clear();
+    msg.write(owning_stream_);
+    RosMsgParser::Span<const uint8_t> buffer = owning_stream_.getSpan();
 
-    RosMsgParser::Span<const uint8_t> buffer(buffer_.data(), msg_size);
     parser_.deserializeIntoFlatMsg(buffer, &flat_msg_);
 
     for (auto& [leaf, variant] : flat_msg_.value)
@@ -280,7 +316,7 @@ class TopicAggregator
 
   // Buffers
   RosMsgParser::FlatMessage flat_msg_;
-  std::vector<uint8_t> buffer_;
+  OwningStream owning_stream_;
 };
 
 /**
