@@ -26,7 +26,7 @@ Conversion rules are as follows:
 
 Benchmarking code is at [fast_rosbag_pandas_benchmark](https://github.com/samkhal/fast_rosbag_pandas_benchmark).
 
-Graphs of performance over time this package over time are on the [airspeed velocity site](https://samkhal.github.io/fast_rosbag_pandas_benchmark).
+Graphs of performance over time for this package are on the [airspeed velocity site](https://samkhal.github.io/fast_rosbag_pandas_benchmark).
 
 Benchmarks comparing `fast_rosbag_pandas` (latest) to `rosbag_pandas` (0.5.0.0, pure python implementation) are below.
 Note: fast_rosbag_pandas doesn't currently construct an index, while rosbag_pandas does.
