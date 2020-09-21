@@ -34,9 +34,9 @@ Note: fast_rosbag_pandas doesn't currently construct an index, while rosbag_pand
 ## Bag of StampedPoint messages
 |                |   rosbag_pandas (s) |   fast_rosbag_pandas (s) |   speedup factor |
 |:---------------|--------------------:|-------------------------:|-----------------:|
-| points_1k.bag  |              0.3419 |                   0.0025 |            137.4 |
-| points_1m.bag  |             20.6032 |                   1.1907 |             17.3 |
-| points_10m.bag |            197.8608 |                  11.6739 |             16.9 |
+| points_1k.bag  |              0.3186 |                   0.0017 |            191.6 |
+| points_1m.bag  |             19.7710 |                   0.8971 |             22.0 |
+| points_10m.bag |            195.9612 |                   8.4081 |             23.3 |
 
 # Limitations
 This library assumes it is built and run on little-endian architectures only.
