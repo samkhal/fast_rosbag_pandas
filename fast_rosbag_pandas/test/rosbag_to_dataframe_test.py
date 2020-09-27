@@ -32,7 +32,7 @@ from std_msgs.msg import (
     MultiArrayDimension,
 )
 
-from geometry_msgs.msg import PointStamped, Point
+from geometry_msgs.msg import PointStamped, Point, PoseArray, Pose, Quaternion
 from sensor_msgs.msg import Imu
 
 STD_INT_MSG_TYPES = [Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64]
@@ -76,6 +76,12 @@ class TestTemp(unittest.TestCase):
             multiarray_msg.dim = [MultiArrayDimension("", 1, 2)]
             multiarray_msg.data_offset = 5
             bag.write("topic_multiarraylayout", multiarray_msg)
+
+            # Write poses
+            cls.pose1 = Pose(Point(1, 1, 1), Quaternion(1, 2, 3, 4))
+            cls.pose2 = Pose(Point(2, 2, 2), Quaternion(1, 2, 3, 4))
+            bag.write("topic_posearray", PoseArray(poses=[cls.pose1, cls.pose2]))
+            bag.write("topic_posearray", PoseArray(poses=[cls.pose2]))
 
     @classmethod
     def tearDownClass(cls):
@@ -150,6 +156,11 @@ class TestTemp(unittest.TestCase):
     def test_invalid_bag(self):
         with self.assertRaises(RuntimeError):
             rosbag_to_dataframe("nonsense_path", "invalid_topic")
+
+    # def test_variable_array_good(self):
+    #     df = rosbag_to_dataframe(self.bagpath, "topic_posearray")
+    #     self.assertEqual(df["poses"][0][0], self.pose1)
+    #     self.assertEqual(df["poses"][0][1], self.pose2)
 
 
 if __name__ == "__main__":
