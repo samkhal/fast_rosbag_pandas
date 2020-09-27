@@ -157,10 +157,12 @@ class TestTemp(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             rosbag_to_dataframe("nonsense_path", "invalid_topic")
 
-    # def test_variable_array_good(self):
-    #     df = rosbag_to_dataframe(self.bagpath, "topic_posearray")
-    #     self.assertEqual(df["poses"][0][0], self.pose1)
-    #     self.assertEqual(df["poses"][0][1], self.pose2)
+    def test_variable_array_good(self):
+        df = rosbag_to_dataframe(self.bagpath, "topic_posearray")
+        print(df)
+        print(df["poses.0"][0])
+        self.assertEqual(df["poses"][0][0], self.pose1)
+        self.assertEqual(df["poses"][0][1], self.pose2)
 
 
 if __name__ == "__main__":

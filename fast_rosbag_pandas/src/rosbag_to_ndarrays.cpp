@@ -124,14 +124,42 @@ inline std::string dtype_name(const RosMsgParser::BuiltinType c)
   // clang-format on
 }
 
+inline py::object toPyObject(const RosMsgParser::Variant& variant)
+{
+  const RosMsgParser::BuiltinType c = variant.getTypeID();
+  using namespace RosMsgParser;
+  // clang-format off
+  switch (c) {
+    case BOOL:    return py::cast(variant.extract<bool>());
+    case BYTE:    return py::cast(variant.extract<int8_t>());
+    case INT8:    return py::cast(variant.extract<int8_t>());
+    case CHAR:    return py::cast(variant.extract<uint8_t>());
+    case UINT8:   return py::cast(variant.extract<uint8_t>());    
+    case UINT16:  return py::cast(variant.extract<uint16_t>());
+    case INT16:   return py::cast(variant.extract<int16_t>()); 
+    case UINT32:  return py::cast(variant.extract<uint32_t>());
+    case INT32:   return py::cast(variant.extract<int32_t>());
+    case FLOAT32: return py::cast(variant.extract<float>());
+    case UINT64:  return py::cast(variant.extract<uint64_t>());
+    case INT64:   return py::cast(variant.extract<int64_t>());
+    case FLOAT64: return py::cast(variant.extract<double>());
+    // case TIME:    return variant.extract<datetime64[ns]_t>();
+    // case DURATION:return variant.extract<timedelta64[ns]_t>(); 
+    default:
+      throw std::runtime_error("Unsupported dtype for toPyObject");
+  }
+  // clang-format on
+}
+
 class FieldAggregator
 {
  public:
   using UPtr = std::unique_ptr<FieldAggregator>;
 
-  virtual void addScalar(const RosMsgParser::Variant& variant) = 0;
-  virtual void addString(const std::string& string) = 0;
+  virtual void addScalar(const RosMsgParser::FieldTreeLeaf&, const RosMsgParser::Variant& variant) = 0;
+  virtual void addString(const RosMsgParser::FieldTreeLeaf&, const std::string& string) = 0;
   virtual py::array getPyArray() = 0;
+  virtual void finalizeMsg(){};
 };
 
 /// Aggregates one message field into an ndarray, one message at a time
@@ -153,7 +181,7 @@ class BuiltinAggregator : public FieldAggregator
     }
   }
 
-  void addScalar(const RosMsgParser::Variant& variant) override
+  void addScalar(const RosMsgParser::FieldTreeLeaf&, const RosMsgParser::Variant& variant) override
   {
     ROS_ASSERT(type_id_ != RosMsgParser::STRING);
 
@@ -180,7 +208,7 @@ class BuiltinAggregator : public FieldAggregator
       throw std::runtime_error("Attempted to add invalid scalar to BuiltinAggregator");
   }
 
-  void addString(const std::string& string) override
+  void addString(const RosMsgParser::FieldTreeLeaf&, const std::string& string) override
   {
     ROS_ASSERT(type_id_ == RosMsgParser::STRING);
 
@@ -236,12 +264,41 @@ class DynArrayAggregator : public FieldAggregator
  public:
   using UPtr = std::unique_ptr<FieldAggregator>;
 
-  void addScalar(const RosMsgParser::Variant& variant){};
-  void addString(const std::string& string){};
-  py::array getPyArray()
+  DynArrayAggregator(size_t msg_count)
   {
-    return py::array{};
+    py_object_data_ = new std::vector<PyObject*>();
+    py_object_data_->reserve(msg_count);
+  }
+
+  void addScalar(const RosMsgParser::FieldTreeLeaf& leaf, const RosMsgParser::Variant& variant) override
+  {
+    auto pair = std::make_pair(leaf.toStdString(), toPyObject(variant));
+    current_msg.insert(pair);
   };
+  void addString(const RosMsgParser::FieldTreeLeaf& leaf, const std::string& string) override
+  {
+    auto pair = std::make_pair(leaf.toStdString(), py::cast(string));
+    current_msg.insert(pair);
+  };
+
+  void finalizeMsg() override
+  {
+    PyObject* obj = py::cast(current_msg).release().ptr();
+    py_object_data_->push_back(obj);
+
+    current_msg.clear();
+  }
+
+  py::array getPyArray() override
+  {
+    // TODO fix memory leak
+    py::dtype dtype("object");
+    return py::array(dtype, py_object_data_->size(), py_object_data_->data());
+  };
+
+ private:
+  std::vector<PyObject*>* py_object_data_ = nullptr;
+  std::unordered_map<std::string, py::object> current_msg;
 };
 
 enum class DynamicArrayPolicy
@@ -274,18 +331,21 @@ class TopicAggregator
 
     for (auto& [leaf, variant] : flat_msg_.value)
     {
-      bool valid_aggregator = initFieldAggregatorIfNeeded(leaf, variant.getTypeID(), msg_count_);
+      auto aggregator = getFieldAggregator(leaf, variant.getTypeID(), msg_count_);
 
-      if (valid_aggregator)
-        field_aggregators_.at(leaf)->addScalar(variant);
+      if (aggregator)
+        aggregator->addScalar(leaf, variant);
     }
     for (auto& [leaf, string] : flat_msg_.name)
     {
-      bool valid_aggregator = initFieldAggregatorIfNeeded(leaf, RosMsgParser::STRING, msg_count_);
+      auto aggregator = getFieldAggregator(leaf, RosMsgParser::STRING, msg_count_);
 
-      if (valid_aggregator)
-        field_aggregators_.at(leaf)->addString(string);
+      if (aggregator)
+        aggregator->addString(leaf, string);
     }
+
+    for (auto& aggregator_entry : field_aggregators_)
+      aggregator_entry.second->finalizeMsg();
 
     fields_initialized_ = true;
   }
@@ -307,38 +367,58 @@ class TopicAggregator
   }
 
  private:
-  bool initFieldAggregatorIfNeeded(const RosMsgParser::FieldTreeLeaf& leaf,
-                                   RosMsgParser::BuiltinType type,
-                                   size_t msg_count)
+  FieldAggregator* getFieldAggregator(const RosMsgParser::FieldTreeLeaf& leaf,
+                                      RosMsgParser::BuiltinType type,
+                                      size_t msg_count)
   {
     // Supporting dynamic arrays means any field could be nullable; don't support for now
     auto root_dynamic_array_leaf = getRootDynamicArray(leaf);
     bool in_dyn_array = root_dynamic_array_leaf.node_ptr->parent() != nullptr;
+
     if (in_dyn_array && dyn_array_policy_ == DynamicArrayPolicy::Discard)
-      return false;
+      return nullptr;
 
     if (!fields_initialized_)
+    {
       if (in_dyn_array)
-        field_aggregators_.emplace(std::make_pair(root_dynamic_array_leaf, std::make_unique<DynArrayAggregator>()));
+      {
+        if (field_aggregators_.count(root_dynamic_array_leaf) == 0)
+        {
+          auto result = field_aggregators_.emplace(
+              std::make_pair(root_dynamic_array_leaf, std::make_unique<DynArrayAggregator>(msg_count)));
+          return result.first->second.get();
+        }
+      }
       else
-        field_aggregators_.emplace(std::make_pair(leaf, std::make_unique<BuiltinAggregator>(type, msg_count)));
+      {
+        auto result =
+            field_aggregators_.emplace(std::make_pair(leaf, std::make_unique<BuiltinAggregator>(type, msg_count)));
+        return result.first->second.get();
+      }
+    }
 
-    return true;
+    if (in_dyn_array)
+      return field_aggregators_.at(root_dynamic_array_leaf).get();
+    else
+      return field_aggregators_.at(leaf).get();
   }
 
   // Return message root if not found
   RosMsgParser::FieldTreeLeaf getRootDynamicArray(const RosMsgParser::FieldTreeLeaf& leaf)
   {
+    // std::cout << "rec: " << leaf.toStdString() << " " << leaf.node_ptr->value()->arraySize() << std::endl;
     if (leaf.node_ptr->value()->arraySize() == -1)
-      return leaf;
+    {
+      RosMsgParser::FieldTreeLeaf dyn_leaf = leaf;
+      dyn_leaf.index_array.back() = 0;
+      return dyn_leaf;
+    }
     else if (leaf.node_ptr->parent() == nullptr)
       return leaf;
     else
     {
       RosMsgParser::FieldTreeLeaf parent_leaf = leaf;
       parent_leaf.node_ptr = leaf.node_ptr->parent();
-      if (leaf.node_ptr->value()->arraySize() > 1)
-        parent_leaf.index_array.pop_back();
       return getRootDynamicArray(parent_leaf);
     }
   }
@@ -392,7 +472,8 @@ std::unordered_map<std::string, py::array> rosbag_to_ndarrays(const std::string&
   {
     if (connection->topic == topic)
     {
-      topic_aggregator = std::make_unique<TopicAggregator>(*connection, bag_view.size(), DynamicArrayPolicy::Discard);
+      topic_aggregator =
+          std::make_unique<TopicAggregator>(*connection, bag_view.size(), DynamicArrayPolicy::PyMessageArray);
       break;
     }
   }

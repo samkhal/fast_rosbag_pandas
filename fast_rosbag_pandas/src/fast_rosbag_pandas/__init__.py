@@ -29,4 +29,5 @@ def rosbag_to_dataframe(bagpath, topic):
     """
 
     arrays = rosbag_to_ndarrays.rosbag_to_ndarrays(bagpath, topic, False)
+    print(arrays)
     return pandas.DataFrame(arrays)
