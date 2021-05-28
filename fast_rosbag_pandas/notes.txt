@@ -1,0 +1,88 @@
+TODO:
+    Add index
+    Add to EdgeAI, for everything that doesn't contain dynamic arrays
+    Add blobs
+
+optimizations:
+
+Current time on 1m: 5.4 total based on `time ./benchmark`
+Build with catkin_make VERBOSE=1
+
+
+Not optimized:
+catkin_make VERBOSE=1 -DCMAKE_CXX_FLAGS=-O0 -DCMAKE_BUILD_TYPE=
+
+-O2: 1.538, 1.576, 1.597
+-O3: 1.548, 1.542, 1.562
+    no noticeable difference, stick with -O2 for now
+    
+catkin_make VERBOSE=1 -DCMAKE_CXX_FLAGS="-O3 -g" -DCMAKE_BUILD_TYPE=
+
+-- Stream optimization
+40% of add message taken up by 2 calls to readMessageDataHeaderFromBuffer; once to compute the size, once to write to stream
+    To write to stream: MessageInstance::write -> readMessageDataIntoStream -> readMessageDataHeaderFromBuffer
+        This is the actually important bit, that does the memcpy from the bag into our 
+
+    To get size: MessageInstance::size -> readMessageDataSize -> readMessaegDataHeaderFromBuffer
+
+    necessary stream methods:
+        stream.advance(size)
+            
+        // Ostream constructor:
+            OStream(uint8_t* data, uint32_t count)
+        : Stream(data, count) {}
+
+        Stream
+
+--
+after stream fix:
+20% taken by deserialize
+28% by readMessageDataHeaderFromBuffer
+6% by ~ros::Header...
+
+--
+With stream fix:
+    0.870, 0.864, 0.885
+    Same but with DNDEBUG:
+    0.869, 0.860, 0.878
+
+lambda1: 0.838, 0.836, 0.842
+
+disablingchecks?: 0.840, 0.845, 0.849
+    Doesn't help
+flto?: 0.831, 0.840, 0.843 (rosbag_storage not included in lto...)
+
+pgo?: 0.792, 0.792, 0.808 
+    Another 5%!
+
+flto+pgo?: 0.788, 0.794, 0.779
+    maybe better?
+
+    catkin_make VERBOSE=1 -DCMAKE_CXX_FLAGS="-O3 -g -DNDEBUG -flto -fprofile-generate=/home/sam/misc/profile" -DCMAKE_BUILD_TYPE=
+    catkin_make VERBOSE=1 -DCMAKE_CXX_FLAGS="-O3 -g -DNDEBUG -flto -fprofile-use=/home/sam/misc/profile" -DCMAKE_BUILD_TYPE=
+
+--
+Peculiar benchmarks:
+    ASV1 (gh-pages 88ad2f5ef2dc939984bc345b703dc4bc49af8bbb)
+        first benchmarked commit 5ae record 3.759 on 1m test
+
+    ASV2 (gh-pages d3a2a382a1e1c3a7d4c4308ef56903007d4c28ac)
+        first benchmarked commit 5ae record 1.796 on 1m test
+
+--
+Pulling out lists of ros messages:
+    In python, can instantiate and deserialize on demand:
+        roslib.message.get_message_class(topic_name)
+
+    Opt 1: original plan, flatten arrays and leave empty values in column
+    Opt 2: treat dynamic arrays as a blob of bytes, deserialize it in python via msg.deserialize
+    Opt 3: deseralize everything flat, but repackage into python object from C++
+
+    Opt 2 seems easiest, but wasteful as everything needs to be deserialized to get the size
+        so it gets deserialized twice
+        stick them into FlatMessage.blob, FieldTreeLeaf should be able to handle non-leaf
+
+        object to return:
+        For dynamic array of messages:
+            class MessageArray(length, buffer)
+
